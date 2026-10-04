@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "Minimal permissions for the Cursor Atelier desktop window.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

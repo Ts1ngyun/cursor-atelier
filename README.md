@@ -33,6 +33,22 @@ npm run lint
 npm run build
 ```
 
+## Windows App
+
+仓库同时包含一个轻量的 Tauri 2 桌面封装，复用同一套 React/Canvas 代码。桌面版导出时会打开 Windows 原生“另存为”窗口，文件仍只在本机处理。
+
+- 安装包由 GitHub Actions 在 Windows 环境构建。
+- 可在仓库的 **Releases** 页面下载 `-setup.exe`。
+- 本机构建需要 Rust、Microsoft C++ Build Tools 和 Node.js；仅开发网站时不需要这些工具。
+- 发布新版本时先同步修改 `package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 中的版本号。
+
+本地已安装 Tauri 工具链后，可运行：
+
+```bash
+npx @tauri-apps/cli@^2 dev
+npx @tauri-apps/cli@^2 build
+```
+
 生成无版权的本地烟雾测试素材：
 
 ```bash

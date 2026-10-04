@@ -1,0 +1,19 @@
+[package]
+name = "cursor-atelier"
+version = "0.1.0"
+description = "A local-first Windows cursor maker"
+authors = ["Ts1ngyun"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/Ts1ngyun/cursor-atelier"
+
+[lib]
+name = "cursor_atelier_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"

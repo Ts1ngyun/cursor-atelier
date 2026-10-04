@@ -144,12 +144,12 @@ function App() {
       const pngBytes = await renderFrameToPngBytes(selectedFrame, size, smoothing)
       const curBytes = encodeCur(pngBytes, size, size, hotspot)
       const frameSuffix = source && source.frames.length > 1 ? `-frame-${selectedFrameIndex + 1}` : ''
-      downloadBytes(
+      const saved = await downloadBytes(
         curBytes,
         `${sourceName}${frameSuffix}-${size}px.cur`,
         'image/x-icon',
       )
-      setMessage('CUR 已生成并开始下载。')
+      setMessage(saved ? 'CUR 已生成并保存。' : '已取消保存 CUR。')
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'CUR 导出失败。')
     } finally {
@@ -171,8 +171,12 @@ function App() {
         curFrames,
         delaysMs: source.frames.map((frame) => frame.delayMs / speed),
       })
-      downloadBytes(aniBytes, `${sourceName}-${size}px.ani`, 'application/x-navi-animation')
-      setMessage('ANI 已生成并开始下载。')
+      const saved = await downloadBytes(
+        aniBytes,
+        `${sourceName}-${size}px.ani`,
+        'application/x-navi-animation',
+      )
+      setMessage(saved ? 'ANI 已生成并保存。' : '已取消保存 ANI。')
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'ANI 导出失败。')
     } finally {

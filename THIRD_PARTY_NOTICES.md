@@ -11,6 +11,8 @@ Cursor Atelier includes or uses the following direct packages:
 | TypeScript | Static type checking | Apache-2.0 |
 | Vitest | Automated tests | MIT |
 | Oxlint | Linting | MIT |
+| Tauri | Optional Windows desktop application framework | Apache-2.0 OR MIT |
+| Tauri dialog plugin | Native Save dialog in the desktop application | Apache-2.0 OR MIT |
 
 Exact versions and the full transitive dependency graph are recorded in `package-lock.json`.
 
