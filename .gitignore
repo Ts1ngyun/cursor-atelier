@@ -15,6 +15,9 @@ dist-ssr
 # Local format-analysis samples may contain copyrighted assets.
 samples-private/
 
+# Rendered promo video and its local production assets stay out of source control.
+video/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
