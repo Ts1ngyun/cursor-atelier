@@ -1,6 +1,6 @@
 [package]
 name = "cursor-atelier"
-version = "0.1.0"
+version = "0.2.0"
 description = "A local-first Windows cursor maker"
 authors = ["Ts1ngyun"]
 edition = "2021"

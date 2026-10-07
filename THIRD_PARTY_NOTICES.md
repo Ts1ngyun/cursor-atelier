@@ -16,4 +16,4 @@ Cursor Atelier includes or uses the following direct packages:
 
 Exact versions and the full transitive dependency graph are recorded in `package-lock.json`.
 
-The CUR encoder, ANI encoder, GIF frame compositor, hotspot calculations, Canvas rendering, and download logic in this repository were written specifically for Cursor Atelier. No GPL CUR or ANI encoder code is included.
+The CUR encoder, ANI encoder, ZIP writer, INF theme manifest generator, GIF frame compositor, hotspot calculations, Canvas rendering, and download logic in this repository were written specifically for Cursor Atelier. No GPL CUR or ANI encoder code is included. The INF syntax and Windows scheme role mapping follow public Microsoft Windows documentation; no third-party theme installer code was copied.

@@ -15,6 +15,14 @@ Cursor Atelier 是一个轻量、纯浏览器端的 Windows 鼠标指针制作�
 - GIF disposal 2/3 与局部帧合成
 - Canvas 动画预览与全局播放速度调整
 - 浏览器内指针测试区
+- 基础版：制作单个 CUR/ANI；进阶版：分别配置 Windows 15 个经典指针状态
+- 进阶版导出 ZIP，包含全部 CUR/ANI、`install.inf` 和中英双语安装说明
+
+## 安装指针方案
+
+在进阶版中为 15 个状态导入素材；可先设置“正常选择”，再用它补齐空白状态，然后逐一替换。各状态的热点、平滑缩放和动画速度互不影响，输出尺寸对整套方案统一生效。
+
+下载 ZIP 后，**先完整解压**，右键 `install.inf` 选择“安装”（Windows 11 可能需要“显示更多选项”）。再打开“鼠标属性 → 指针”，从“方案”下拉框选择导入的方案，点击“应用”。`install.inf` 会将指针复制到 Windows 的 Cursors 目录并注册当前用户的方案；它不会自动应用方案。Windows 的安装文件扩展名是 `.inf`，不是 `.ini`。
 
 ## 本地开发
 
@@ -39,6 +47,7 @@ npm run build
 
 - 安装包由 GitHub Actions 在 Windows 环境构建。
 - 可在仓库的 **Releases** 页面下载 `-setup.exe`。
+- 安装包发行者元数据和项目署名为 `Ts1ngyun`，NSIS 安装向导提供简体中文和英文。由于安装包目前**没有代码签名**，Windows SmartScreen 仍可能显示“未知发布者”或风险警告；仅修改署名无法消除该提示，请核对 GitHub Release 来源后再自行决定是否安装。
 - 本机构建需要 Rust、Microsoft C++ Build Tools 和 Node.js；仅开发网站时不需要这些工具。
 - 发布新版本时先同步修改 `package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 中的版本号。
 

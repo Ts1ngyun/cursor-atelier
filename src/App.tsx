@@ -16,11 +16,31 @@ import { downloadBytes, filenameStem } from './export/download'
 import { decodeGifFile } from './image/decode-gif'
 import { decodePngSequence, decodeStaticFile } from './image/decode-static'
 import { renderFrameToPngBytes } from './image/render-frame'
+import { buildThemePackage, type ThemeCursors } from './theme/build-theme'
+import { CURSOR_ROLES, type CursorRoleId } from './theme/roles'
 import './App.css'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 const MAX_SEQUENCE_FILES = 120
 const SPEED_OPTIONS = [0.5, 1, 1.5, 2] as const
+
+type EditorDraft = {
+  source: DecodedSource | null
+  sourceName: string
+  selectedFrameIndex: number
+  hotspot: Hotspot
+  smoothing: boolean
+  speed: number
+}
+
+const EMPTY_DRAFT: EditorDraft = {
+  source: null,
+  sourceName: 'cursor',
+  selectedFrameIndex: 0,
+  hotspot: { x: 0, y: 0 },
+  smoothing: true,
+  speed: 1,
+}
 
 function isPng(file: File) {
   return file.type === 'image/png' || /\.png$/i.test(file.name)
@@ -35,21 +55,36 @@ function isGif(file: File) {
 }
 
 function App() {
-  const [source, setSource] = useState<DecodedSource | null>(null)
-  const [sourceName, setSourceName] = useState('cursor')
-  const [selectedFrameIndex, setSelectedFrameIndex] = useState(0)
+  const [mode, setMode] = useState<'basic' | 'advanced'>('basic')
+  const [basicDraft, setBasicDraft] = useState<EditorDraft>(EMPTY_DRAFT)
+  const [themeDrafts, setThemeDrafts] = useState<Partial<Record<CursorRoleId, EditorDraft>>>({})
+  const [selectedRole, setSelectedRole] = useState<CursorRoleId>('Arrow')
+  const [themeName, setThemeName] = useState('Cursor Atelier 自定义方案')
   const [size, setSize] = useState<OutputSize>(32)
-  const [hotspot, setHotspot] = useState<Hotspot>({ x: 0, y: 0 })
-  const [smoothing, setSmoothing] = useState(true)
-  const [speed, setSpeed] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const draft = mode === 'basic' ? basicDraft : themeDrafts[selectedRole] ?? EMPTY_DRAFT
+  const { source, sourceName, selectedFrameIndex, hotspot, smoothing, speed } = draft
   const selectedFrame = source?.frames[selectedFrameIndex]
+  const filledRoles = CURSOR_ROLES.filter((role) => themeDrafts[role.id]?.source).length
+
+  function updateDraft(updater: (current: EditorDraft) => EditorDraft) {
+    if (mode === 'basic') {
+      setBasicDraft(updater)
+    } else {
+      setThemeDrafts((current) => ({
+        ...current,
+        [selectedRole]: updater(current[selectedRole] ?? EMPTY_DRAFT),
+      }))
+    }
+  }
 
   async function loadFiles(fileList: FileList | File[]) {
+    const targetMode = mode
+    const targetRole = selectedRole
     const files = Array.from(fileList).sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }),
     )
@@ -86,11 +121,16 @@ function App() {
         }
       }
 
-      setSource(decoded)
-      setSourceName(filenameStem(files[0].name))
-      setSelectedFrameIndex(0)
-      setHotspot({ x: 0, y: 0 })
-      setSpeed(1)
+      const nextDraft: EditorDraft = {
+        ...EMPTY_DRAFT,
+        source: decoded,
+        sourceName: filenameStem(files[0].name),
+      }
+      if (targetMode === 'basic') {
+        setBasicDraft(nextDraft)
+      } else {
+        setThemeDrafts((current) => ({ ...current, [targetRole]: nextDraft }))
+      }
       setMessage(
         decoded.frames.length > 1
           ? `已在本地解析 ${decoded.frames.length} 帧。`
@@ -115,25 +155,75 @@ function App() {
 
   function handleSizeChange(nextSize: OutputSize) {
     setSize(nextSize)
-    setHotspot((current) => clampHotspot(current, nextSize))
+    setBasicDraft((current) => ({ ...current, hotspot: clampHotspot(current.hotspot, nextSize) }))
+    setThemeDrafts((current) => Object.fromEntries(
+      Object.entries(current).map(([role, value]) => [
+        role,
+        { ...value, hotspot: clampHotspot(value.hotspot, nextSize) },
+      ]),
+    ) as Partial<Record<CursorRoleId, EditorDraft>>)
   }
 
   function updateHotspot(axis: keyof Hotspot, rawValue: string) {
     const value = Number.parseInt(rawValue, 10)
     if (Number.isNaN(value)) return
-    setHotspot((current) => clampHotspot({ ...current, [axis]: value }, size))
+    updateDraft((current) => ({
+      ...current,
+      hotspot: clampHotspot({ ...current.hotspot, [axis]: value }, size),
+    }))
   }
 
   function updatePngSequenceDelay(rawValue: string) {
     const value = Math.min(5000, Math.max(17, Number.parseInt(rawValue, 10) || 100))
-    setSource((current) =>
-      current
+    updateDraft((current) => ({
+      ...current,
+      source: current.source
         ? {
-            ...current,
-            frames: current.frames.map((frame) => ({ ...frame, delayMs: value })),
+            ...current.source,
+            frames: current.source.frames.map((frame) => ({ ...frame, delayMs: value })),
           }
-        : current,
-    )
+        : null,
+    }))
+  }
+
+  async function exportThemeZip() {
+    if (filledRoles !== CURSOR_ROLES.length) {
+      setError('请先为全部 15 个状态设置图片。')
+      return
+    }
+    setIsExporting(true)
+    setError(null)
+    try {
+      const cursors = {} as ThemeCursors
+      for (const role of CURSOR_ROLES) {
+        const roleDraft = themeDrafts[role.id]
+        if (!roleDraft?.source) throw new Error(`缺少「${role.label}」的指针。`)
+        setMessage(`正在生成「${role.label}」…`)
+        const curFrames: Uint8Array[] = []
+        for (const frame of roleDraft.source.frames) {
+          const png = await renderFrameToPngBytes(frame, size, roleDraft.smoothing)
+          curFrames.push(encodeCur(png, size, size, roleDraft.hotspot))
+        }
+        if (curFrames.length > 1) {
+          cursors[role.id] = {
+            extension: 'ani',
+            bytes: encodeAni({
+              curFrames,
+              delaysMs: roleDraft.source.frames.map((frame) => frame.delayMs / roleDraft.speed),
+            }),
+          }
+        } else {
+          cursors[role.id] = { extension: 'cur', bytes: curFrames[0] }
+        }
+      }
+      const zip = buildThemePackage(themeName, cursors)
+      const saved = await downloadBytes(zip, `${filenameStem(themeName)}-${size}px.zip`, 'application/zip')
+      setMessage(saved ? '主题 ZIP 已生成。解压后请阅读 README.txt，再右键安装 install.inf。' : '已取消保存主题包。')
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : '主题导出失败。')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   async function exportCurrentCur() {
@@ -209,6 +299,71 @@ function App() {
           </p>
         </section>
 
+        <section className="mode-panel" aria-label="制作模式">
+          <div className="mode-switch">
+            <button type="button" className={mode === 'basic' ? 'is-active' : ''} onClick={() => { setMode('basic'); setError(null); setMessage(null) }}>
+              基础版 <small>单个指针</small>
+            </button>
+            <button type="button" className={mode === 'advanced' ? 'is-active' : ''} onClick={() => { setMode('advanced'); setError(null); setMessage(null) }}>
+              进阶版 <small>完整指针方案</small>
+            </button>
+          </div>
+          <p>{mode === 'basic' ? '和之前一样，导入图片即可下载一个 CUR 或 ANI。' : '为 Windows 的 15 个经典状态分别指定图片或动画，最后打包为可安装的方案。'}</p>
+        </section>
+
+        {mode === 'advanced' && (
+          <section className="theme-panel panel" aria-label="指针方案状态">
+            <div className="theme-panel-heading">
+              <div>
+                <span className="step-label">完整指针方案</span>
+                <h2>逐个设计，每一种状态都算数。</h2>
+                <p>已设置 {filledRoles}/{CURSOR_ROLES.length} · 选择状态后，在下方导入它的图片。</p>
+              </div>
+              <label className="theme-name">
+                <span>方案名称</span>
+                <input value={themeName} maxLength={60} onChange={(event) => setThemeName(event.target.value)} placeholder="为方案取个名字" />
+              </label>
+            </div>
+            <div className="role-grid">
+              {CURSOR_ROLES.map((role, index) => (
+                <button
+                  key={role.id}
+                  type="button"
+                  className={`role-card${selectedRole === role.id ? ' is-selected' : ''}${themeDrafts[role.id]?.source ? ' is-ready' : ''}`}
+                  onClick={() => { setSelectedRole(role.id); setError(null); setMessage(null) }}
+                  aria-pressed={selectedRole === role.id}
+                >
+                  <span className="role-number">{String(index + 1).padStart(2, '0')}</span>
+                  <strong>{role.label}</strong>
+                  <span className="role-status">{themeDrafts[role.id]?.source ? '✓ 已设置' : '＋ 待设置'}</span>
+                </button>
+              ))}
+            </div>
+            <div className="theme-panel-footer">
+              <p>缺少的“水平调整”也已补齐。安装文件是 Windows 使用的 <code>install.inf</code>，不是 <code>.ini</code>。</p>
+              <button type="button" onClick={() => {
+                const arrow = themeDrafts.Arrow
+                if (!arrow?.source) return
+                setThemeDrafts((current) => Object.fromEntries(
+                  CURSOR_ROLES.map((role) => [role.id, current[role.id] ?? arrow]),
+                ) as Partial<Record<CursorRoleId, EditorDraft>>)
+                setMessage('已将“正常选择”复制到空白状态；仍可逐一替换。')
+              }} disabled={!themeDrafts.Arrow?.source || isExporting}>
+                用“正常选择”补齐空白状态
+              </button>
+            </div>
+            <div className="theme-export">
+              <div>
+                <strong>导出整套 Windows 指针方案</strong>
+                <small>ZIP 内含 15 个 CUR/ANI、install.inf 和中英双语说明。先解压，再右键安装。</small>
+              </div>
+              <button type="button" className="button primary" onClick={exportThemeZip} disabled={isExporting || filledRoles !== CURSOR_ROLES.length}>
+                {isExporting ? '正在生成…' : `下载主题 ZIP · ${filledRoles}/${CURSOR_ROLES.length}`}
+              </button>
+            </div>
+          </section>
+        )}
+
         <label
           className={isLoading ? 'dropzone is-loading' : 'dropzone'}
           onDrop={handleDrop}
@@ -223,7 +378,7 @@ function App() {
           />
           <span className="dropzone-icon" aria-hidden="true">＋</span>
           <span className="dropzone-copy">
-            <strong>{isLoading ? '正在本地解析…' : source ? '替换图片或动画' : '选择或拖入图片'}</strong>
+            <strong>{isLoading ? '正在本地解析…' : mode === 'advanced' ? `为“${CURSOR_ROLES.find((role) => role.id === selectedRole)?.label}”${source ? '替换' : '导入'}图片` : source ? '替换图片或动画' : '选择或拖入图片'}</strong>
             <small>单张 PNG / JPG / GIF，或多张 PNG · 单文件最大 20 MB</small>
           </span>
           <span className="dropzone-action">浏览文件</span>
@@ -252,7 +407,7 @@ function App() {
                   size={size}
                   smoothing={smoothing}
                   hotspot={hotspot}
-                  onHotspotChange={setHotspot}
+                  onHotspotChange={(nextHotspot) => updateDraft((current) => ({ ...current, hotspot: nextHotspot }))}
                 />
               </article>
 
@@ -317,7 +472,7 @@ function App() {
                     <input
                       type="checkbox"
                       checked={smoothing}
-                      onChange={(event) => setSmoothing(event.target.checked)}
+                      onChange={(event) => updateDraft((current) => ({ ...current, smoothing: event.target.checked }))}
                     />
                     <span aria-hidden="true" />
                   </label>
@@ -327,7 +482,7 @@ function App() {
                   <div className="control-group animation-controls">
                     <label>
                       <span className="control-title">播放速度</span>
-                      <select value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>
+                      <select value={speed} onChange={(event) => updateDraft((current) => ({ ...current, speed: Number(event.target.value) }))}>
                         {SPEED_OPTIONS.map((option) => (
                           <option key={option} value={option}>{option}×</option>
                         ))}
@@ -366,7 +521,7 @@ function App() {
                   selectedIndex={selectedFrameIndex}
                   size={size}
                   smoothing={smoothing}
-                  onSelect={setSelectedFrameIndex}
+                  onSelect={(nextIndex) => updateDraft((current) => ({ ...current, selectedFrameIndex: nextIndex }))}
                 />
               </section>
             )}
@@ -406,7 +561,7 @@ function App() {
               </article>
             </section>
 
-            <section className="export-bar" aria-label="导出">
+            {mode === 'basic' && <section className="export-bar" aria-label="导出">
               <div>
                 <span className="step-label">04 · 导出</span>
                 <h2>{source.frames.length > 1 ? '下载当前帧或完整动画' : '下载 Windows CUR 文件'}</h2>
@@ -429,7 +584,7 @@ function App() {
                   </button>
                 )}
               </div>
-            </section>
+            </section>}
           </>
         ) : (
           <section className="empty-state">
