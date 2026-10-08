@@ -1,6 +1,6 @@
-# Cursor Atelier
+# Cursor Atelier光标工作室
 
-Cursor Atelier 是一个轻量、纯浏览器端的 Windows 鼠标指针制作工具。图片解码、Canvas 绘制、CUR/ANI 编码和下载全部在本地完成，不需要后端、账户或云端存储。
+Cursor Atelier 是一个轻量、纯Web端的 Windows 鼠标指针自定义工具。图片解码、Canvas 绘制、CUR/ANI 编码和下载全部在本地完成。
 
 ## 功能
 
@@ -8,7 +8,7 @@ Cursor Atelier 是一个轻量、纯浏览器端的 Windows 鼠标指针制作�
 - 多张 PNG → ANI
 - GIF → ANI
 - GIF 任意单帧 → CUR
-- 32×32、48×48、64×64 输出，默认推荐 32×32
+- 32×32、48×48、64×64 输出
 - 等比例居中缩放，透明画布补齐
 - 平滑缩放开关，关闭后适合像素画
 - 点击画布或输入坐标设置热点
